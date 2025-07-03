@@ -11,62 +11,6 @@
 
 ---
 
-Maintenant que vous comprenez les enjeux, voici comment configurer les politiques selon vos besoins :
-
-| Scénario | Commande | Usage typique |
-|----------|----------|---------------|
-| **Développement local** | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` | Scripts locaux libres, téléchargés signés |
-| **Production d'entreprise** | `Set-ExecutionPolicy AllSigned` | Conformité / traçabilité maximale |
-| **CI/CD temporaire** | `pwsh -ExecutionPolicy Bypass -File script.ps1` | Job éphémère, pas de changement permanent |
-| **Tests & développement** | `Set-ExecutionPolicy -Scope Process Unrestricted` | Session temporaire uniquement |
-
-#### Vérifier la politique actuelle
-
-```powershell
-# Voir toutes les politiques par scope
-Get-ExecutionPolicy -List
-
-# Politique effective (celle qui s'applique)
-Get-ExecutionPolicy
-
-# Exemple de sortie :
-#        Scope ExecutionPolicy
-#        ----- ---------------
-#MachinePolicy       Undefined
-#   UserPolicy       Undefined
-#      Process       Undefined
-#  CurrentUser    RemoteSigned
-# LocalMachine    RemoteSigned
-```
-
-#### Commandes pratiques
-
-```powershell
-# Configuration recommandée pour développeur
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned -Force
-
-# Temporaire pour une session de test
-Set-ExecutionPolicy -Scope Process Unrestricted
-
-# Débloquer un script téléchargé spécifique
-Unblock-File -Path ".\script-telecharge.ps1"
-
-# Vérifier si un script est bloqué
-Get-Item ".\script-telecharge.ps1" | Select-Object Name, @{Name="Blocked"; Expression={$_.Attributes -band [System.IO.FileAttributes]::ReadOnly}}
-```
-
-> **💡 Bonnes pratiques :**
-> 
-> - **Développement** : `RemoteSigned` sur `CurrentUser` (pas besoin de droits admin)
-> - **Production** : `AllSigned` + certificats d'entreprise
-> - **Scripts internes** : Signez avec un certificat auto-signé de votre organisation
-> - **Urgence** : `Unblock-File` plutôt que `Bypass` global Ajoutez **VS Code + extension PowerShell** et activez **PSReadLine 2.4** pour la complétion prédictive.
-> 3. Créez votre **profil** (`$PROFILE`) pour charger modules, alias, prompt personnalisé.
-> 4. Gérez les modules via **PSResourceGet** plutôt que PowerShellGet.
-> 5. Sécurisez l’exécution avec une politique `RemoteSigned` (ou plus stricte en prod) et mettez votre shell à jour régulièrement.
-
----
-
 ### 1. Installation rapide par plateforme
 
 | Plateforme                     | Méthode 1 : « 1 ligne »                                             | Méthode 2 : Package officiel                                                                                      | Notes                                                                                                                   |
@@ -90,21 +34,103 @@ flowchart LR
 
 ---
 
-### 2. Optimiser votre terminal
+### 2. Optimiser votre terminal et éditeur
 
-1. **Éditeur conseillé** : **Visual Studio Code** + extension *PowerShell* (débogueur, IntelliSense, PSScriptAnalyzer).
-2. **Terminal moderne** :
+#### 2.1. Installation de Visual Studio Code + Extension PowerShell
 
-   * **Windows Terminal** (onglets, thèmes, GPU text rendering).
-   * **oh-my-posh** ou **Starship** pour un prompt riche, cross-platform.
-3. **PSReadLine 2.4** (déjà inclus) :
+**Visual Studio Code** est l'éditeur recommandé pour PowerShell avec débogueur intégré, IntelliSense et PSScriptAnalyzer.
 
+##### Installation rapide avec winget (Windows)
+
+```powershell
+# Installer VS Code
+winget install --id Microsoft.VisualStudioCode
+
+# Installer l'extension PowerShell via ligne de commande
+code --install-extension ms-vscode.PowerShell
+```
+
+##### Installation sur autres plateformes
+
+| Plateforme | Commande | Extension PowerShell |
+|------------|----------|---------------------|
+| **macOS** | `brew install --cask visual-studio-code` | `code --install-extension ms-vscode.PowerShell` |
+| **Ubuntu/Debian** | `sudo snap install code --classic` | `code --install-extension ms-vscode.PowerShell` |
+| **Fedora/RHEL** | `sudo dnf install code` | `code --install-extension ms-vscode.PowerShell` |
+
+##### Configuration VS Code pour PowerShell
+
+Créez ou modifiez `~/.vscode/settings.json` (ou `%APPDATA%\Code\User\settings.json` sur Windows) :
+
+```json
+{
+    "powershell.integratedConsole.showOnStartup": false,
+    "powershell.codeFormatting.preset": "OTBS",
+    "powershell.scriptAnalysis.enable": true,
+    "powershell.developer.bundledModulesPath": "",
+    "files.defaultLanguage": "powershell",
+    "editor.semanticTokenColorCustomizations": {
+        "enabled": true
+    }
+}
+```
+
+##### Vérification de l'installation
+
+```powershell
+# Vérifier que VS Code est installé
+code --version
+
+# Lister les extensions installées
+code --list-extensions | Where-Object { $_ -like "*powershell*" }
+
+# Ouvrir un fichier PowerShell pour tester
+echo 'Write-Host "Hello PowerShell!"' > test.ps1
+code test.ps1
+```
+
+#### 2.2. Terminal moderne
+
+1. **Windows Terminal** (onglets, thèmes, GPU text rendering) (natif Windows 11) :
    ```powershell
-   Set-PSReadLineOption -PredictionSource HistoryAndPlugin
-   Install-Module PSReadLine -Scope CurrentUser -Force   # si mise à jour
+   winget install --id Microsoft.WindowsTerminal
    ```
 
-   *Résultat : suggestions inline façon GitHub Copilot pour vos commandes.*
+2. **oh-my-posh** pour un prompt riche et cross-platform :
+   ```powershell
+   winget install JanDeDobbeleer.OhMyPosh
+   ```
+
+#### 2.3. PSReadLine pour l'auto-complétion avancée
+
+```powershell
+# PSReadLine 2.4 (déjà inclus dans PowerShell 7.5+)
+Set-PSReadLineOption -PredictionSource HistoryAndPlugin
+
+# Mise à jour si nécessaire
+Install-Module PSReadLine -Scope CurrentUser -Force
+```
+
+*Résultat : suggestions inline façon GitHub Copilot pour vos commandes.*
+
+#### 2.4. Configuration complète en une fois
+
+```powershell
+# Script d'installation complète pour Windows
+# Installer tous les outils recommandés
+winget install --id Microsoft.VisualStudioCode
+winget install --id Microsoft.WindowsTerminal  
+winget install --id JanDeDobbeleer.OhMyPosh
+
+# Installer les extensions VS Code
+code --install-extension ms-vscode.PowerShell
+
+# Configurer PSReadLine
+Set-PSReadLineOption -PredictionSource HistoryAndPlugin
+Set-PSReadLineOption -PredictionViewStyle ListView
+
+Write-Host "✅ Installation terminée ! Redémarrez votre terminal." -ForegroundColor Green
+```
 
 ---
 
@@ -141,16 +167,16 @@ La **politique d'exécution** (Execution Policy) est un mécanisme de sécurité
 ```mermaid
 graph TB
     A[Script PowerShell téléchargé] --> B{Politique d'exécution}
-    B -->|Restrictive| C[❌ Bloqué]
-    B -->|RemoteSigned| D{Script signé ?}
-    B -->|Unrestricted| E[✅ Exécuté]
-    D -->|Oui| F[✅ Exécuté]
-    D -->|Non| G[❌ Bloqué]
-    
-    style C fill:#ffebee
-    style G fill:#ffebee
-    style E fill:#e8f5e8
-    style F fill:#e8f5e8
+        B -->|Restrictive| C[<span style="color:#c62828">❌ Bloqué</span>]
+        B -->|RemoteSigned| D{Script signé&nbsp;?}
+        B -->|Unrestricted| E[<span style="color:#2e7d32">✅ Exécuté</span>]
+        D -->|Oui| F[<span style="color:#2e7d32">✅ Exécuté</span>]
+        D -->|Non| G[<span style="color:#c62828">❌ Bloqué</span>]
+
+        style C fill:#ffebee
+        style G fill:#ffebee
+        style E fill:#e8f5e8
+        style F fill:#e8f5e8
 ```
 
 **Risques sans politique d'exécution :**

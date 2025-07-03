@@ -30,20 +30,19 @@
 ## 2. Une (courte) histoire de PowerShell
 
 ```mermaid
-gitgraph
-    commit id: "2003: Projet Monad"
-    commit id: "2006: PowerShell 1.0 (Windows)"
-    commit id: "2009: PowerShell 2.0 — Remoting"
-    commit id: "2012: PowerShell 3.0 — Workflows"
-    commit id: "2014: PowerShell 4.0 — DSC"
-    commit id: "2016: PowerShell 5.0/5.1 — OneGet"
-    branch core
-    checkout core
-    commit id: "2016: PowerShell Core 6.0 — Open Source"
-    commit id: "2020: PowerShell 7.0 — Fusion"
-    commit id: "2023: PowerShell 7.4 (LTS) — .NET 8"
-    commit id: "2025-06: PowerShell 7.5.2 (Stable)"
-    commit id: "2025-05: PowerShell 7.6-preview 4"
+timeline
+    title Évolution de PowerShell
+    2003 : Projet « Monad »
+    2006 : PowerShell 1.0 (Windows)
+    2009 : PowerShell 2.0 — Remoting
+    2012 : PowerShell 3.0 — Workflows
+    2014 : PowerShell 4.0 — DSC
+    2016 : PowerShell 5.0/5.1 — OneGet, fin du « Windows PS »
+    2016 : PowerShell Core 6.0 — Open source & multiplateforme
+    2020 : PowerShell 7.0 — Fusion Core/Windows
+    2023 : PowerShell 7.4 (LTS) — .NET 8
+    2025-06 : PowerShell 7.5.2 (Stable) — .NET 9
+    2025-05 : PowerShell 7.6-preview 4
 ```
 
 ### Jalons importants

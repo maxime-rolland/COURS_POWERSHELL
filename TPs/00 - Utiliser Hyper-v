@@ -80,7 +80,7 @@ function New-LabVM {
         [int]$MemoryGB = 2,
         [int]$CPU      = 2,
         [string]$Iso,
-        [string]$Switch = "LabNAT"
+        [string]$Switch = "LabNATdsggds"
     )
     $path  = "$LabRoot\$Name"
     $vhdx  = "$path\$Name.vhdx"

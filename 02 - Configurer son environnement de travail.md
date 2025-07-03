@@ -206,11 +206,6 @@ graph TB
     C --> D[CurrentUser]
     D --> E[LocalMachine]
     
-    style A fill:#ffebee
-    style B fill:#fff3e0
-    style C fill:#e3f2fd
-    style D fill:#e8f5e8
-    style E fill:#f3e5f5
 ```
 
 1. **MachinePolicy** : Défini par GPO d'entreprise (priorité absolue)
@@ -378,18 +373,6 @@ Get-AzSubscription
 | macOS            | `brew upgrade powershell`                                          |
 
 ---
-
-### 7. Checklist de fin d’installation
-
-```mermaid
-graph TD
-  A[pwsh --version] -->|>=7.5 ?| B[OK]
-  B --> C[code --install-extension ms-vscode.PowerShell]
-  C --> D[Set-ExecutionPolicy RemoteSigned]
-  D --> E[Install-Module Microsoft.PowerShell.PSResourceGet]
-  E --> F[Create $PROFILE + alias + prompt]
-  F --> G🎉
-```
 
 > **✅ Vous voilà prêt·e !**
 > Ouvrez `pwsh`, tapez `Get-Help`… et commencez à automatiser le monde.

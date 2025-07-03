@@ -1,0 +1,185 @@
+## Annexe : laboratoire Hyper-V (facultatif)
+
+> *Cette section s’adresse aux apprenants disposant d’un Windows 10/11 **Pro/Enterprise** ou d’un Windows Server avec Hyper-V. Elle n’est **pas** indispensable pour suivre le reste du cours, mais vous donnera un bac à sable local pour vos scripts PowerShell.*
+
+---
+
+### 0. Pré-requis rapides
+
+| Condition                                                   | Vérification                                          |                                          |
+| ----------------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------- |
+| Matériel 64 bits + SLAT                                     | `systeminfo.exe` → ligne *Hyper-V Requirements : Yes* |                                          |
+| **BIOS/UEFI** : virtualisation (Intel VT-x / AMD-V) activée | Voir onglet “Performance” du Gestionnaire des tâches  |                                          |
+| Édition Windows compatible                                  | `winver` ≥ *Pro* / *Education* / *Enterprise*         |                                          |
+| 8 Go de RAM minimum (16 Go recommandé)                      | \`Get-CimInstance Win32\_PhysicalMemory               | Measure-Object -Property Capacity -Sum\` |
+| Environ 60 Go libres sur SSD                                | `Get-PSDrive C`                                       |                                          |
+
+---
+
+### 1. Activer Hyper-V et WinRM
+
+```powershell
+# 1) Fonctionnalité Hyper-V (redémarrage requis)
+Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All -NoRestart
+Restart-Computer
+
+# 2) Service WinRM pour le contrôle à distance
+Start-Service WinRM       # ou Enable-PSRemoting -Force
+```
+
+---
+
+### 2. Préparer l’espace de travail
+
+```powershell
+$LabRoot  = "$HOME\TP-PS-Max"
+New-Item -ItemType Directory -Path $LabRoot -Force
+Set-Location $LabRoot
+```
+
+---
+
+### 3. Récupérer les ISO d’évaluation
+
+> Les URL changent souvent ; récupérez le lien **“Evaluation ISO”** depuis le *Microsoft Evaluation Center*.
+
+```powershell
+# Windows Server 2025 LTSC – 180 jours d’essai
+$serverIso = "$LabRoot\WinServer2025.iso"
+Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2293312&clcid=0x40c&culture=fr-fr&country=fr" -OutFile $serverIso  # lien juillet 2025 :contentReference[oaicite:0]{index=0}
+
+# Windows 11 Enterprise 24H2 – 90 jours d’essai
+$clientIso = "$LabRoot\Win11Ent.iso"
+Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2289031&clcid=0x40c&culture=fr-fr&country=fr" -OutFile $clientIso   # lien Evaluation Center
+```
+
+*≈ 5 Go par ISO, prévoyez du temps ou un gestionnaire de téléchargement.*
+
+---
+
+### 4. Choisir (ou créer) votre commutateur virtuel
+
+```powershell
+# Lister les vSwitch existants
+Get-VMSwitch | Select-Object Name, SwitchType, Notes
+
+# Exemple : créer un switch « LabNAT » isolé avec NAT 10.10.0.0/24
+New-VMSwitch -SwitchName LabNAT -SwitchType Internal
+New-NetIPAddress  -IPAddress 10.10.0.1 -PrefixLength 24 -InterfaceAlias "vEthernet (LabNAT)"
+New-NetNat -Name LabNAT -InternalIPInterfaceAddressPrefix 10.10.0.0/24
+```
+
+---
+
+### 5. Fonction utilitaire : création rapide de VM Gen2
+
+```powershell
+function New-LabVM {
+    param(
+        [Parameter(Mandatory)]$Name,
+        [int]$MemoryGB = 2,
+        [int]$CPU      = 2,
+        [string]$Iso,
+        [string]$Switch = "LabNAT"
+    )
+    $path  = "$LabRoot\$Name"
+    $vhdx  = "$path\$Name.vhdx"
+    New-VM -Name $Name -Generation 2 -MemoryStartupBytes (${MemoryGB}GB) `
+           -Path $path -NewVHDPath $vhdx -NewVHDSizeBytes 40GB -SwitchName $Switch |
+           Set-VM -ProcessorCount $CPU
+
+    Add-VMDvdDrive -VMName $Name -Path $Iso
+    # Boot d’abord sur le DVD, puis disque
+    $dvd = Get-VMDvdDrive -VMName $Name
+    $hdd = Get-VMHardDiskDrive -VMName $Name
+    Set-VMFirmware -VMName $Name -BootOrder $dvd, $hdd
+}
+```
+
+---
+
+### 6. Déployer les machines du TP
+
+```powershell
+# Contrôleur de domaine 1
+New-LabVM -Name DC01    -MemoryGB 2 -CPU 2 -Iso $serverIso
+
+# Contrôleur de domaine 2
+New-LabVM -Name DC02    -MemoryGB 2 -CPU 2 -Iso $serverIso
+
+# Client Windows 11
+New-LabVM -Name CLIENT  -MemoryGB 4 -CPU 4 -Iso $clientIso
+```
+
+> **Astuce** : démarrez la VM puis lancez `vmconnect.exe localhost <NomVM>` pour procéder à l’installation graphique.
+
+---
+
+### 7. Activer TPM virtuel (obligatoire pour Windows 11)
+
+```powershell
+New-HgsGuardian  -Name "LabGuardian" -GenerateCertificates
+$owner   = Get-HgsGuardian LabGuardian
+$kp      = New-HgsKeyProtector -Owner $owner -AllowUntrustedRoot
+Set-VMKeyProtector -VMName CLIENT -KeyProtector $kp.RawData
+Enable-VMTPM -VMName CLIENT
+```
+
+---
+
+### 8. Connexion PowerShell à une VM
+
+```powershell
+# Récupérer l’IP (nécessite que les services d’intégration soient installés)
+$ip = (Get-VM -Name DC01 | Get-VMNetworkAdapter).IpAddresses |
+      Where-Object { $_ -match '\d+\.\d+\.\d+\.\d+' } |
+      Select-Object -First 1
+
+# Autoriser l’hôte à faire confiance à l’IP de la VM
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value $ip -Force
+
+# Session interactive
+Enter-PSSession -ComputerName $ip -Credential Administrator
+```
+
+---
+
+### 9. Sécurité (même en labo !)
+
+* Utilisez un **mot de passe distinct** de celui de votre poste.
+* Conservez le réseau de labo isolé (NAT ou interne).
+* Pensez à `Checkpoint-VM` avant des manipulations risquées.
+* Désactivez ou restreignez WinRM hors de vos besoins précis.
+
+---
+
+### 10. Schéma récapitulatif
+
+```mermaid
+graph TD
+    subgraph Hyper-V Host
+        direction TB
+        H(Windows 10/11 Pro) --> S[LabNAT vSwitch 10.10.0.1]
+        S -->|internal| DC01
+        S --> DC02
+        S --> CLIENT
+    end
+    DC01[DC01<br/>Server 2025]:::srv
+    DC02[DC02<br/>Server 2025]:::srv
+    CLIENT[CLIENT<br/>Win 11 Ent]:::cli
+
+    classDef srv fill:#e3f2fd,stroke:#0366d6;
+    classDef cli fill:#e8f5e9,stroke:#34a853;
+```
+
+---
+
+### 11. Ce que vous venez d’apprendre
+
+* Activer Hyper-V et **créer un vSwitch dédié**.
+* **Automatiser** la création de VM Gen2 avec PowerShell.
+* Préparer des ISO d’évaluation **Windows Server 2025** et **Windows 11 Enterprise**.
+* Activer **TPM virtuel** pour Windows 11.
+* Prendre la main à distance via **WinRM** et PowerShell 7.
+
+Vous disposez désormais d’un mini-domaine pour tester vos scripts : amusez-vous, cassez tout… et remontez vos checkpoints !
